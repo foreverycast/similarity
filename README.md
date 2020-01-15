@@ -10,3 +10,7 @@ Similarity script is for searching duplicates in master data. The script use Lev
  * Go Lang is required
  * The package is still in development
  * Just execute the  go run duplicatesearch.go
+
+## ABOUT THIS RELEASE
+* Tests are not ready
+* stopwords.csv is not working
