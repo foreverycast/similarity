@@ -1,0 +1,8 @@
+{
+    "FileToCompare": "duplicates.csv",
+    "IsAddFileToCheck": true,
+    "AddFileNameToCheck": "additional_accounts.csv",
+    "ResultFileName": "result.csv",
+    "MinSimilarRanking": 0.8,
+    "StopWordsFile": "stopwords.csv"
+}
