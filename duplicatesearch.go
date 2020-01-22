@@ -1,9 +1,10 @@
 package main
 
-// go run .\go\src\hello\helloworld.go
+
 import (
 	"bufio"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -19,8 +20,17 @@ import (
 var NumberOfAccounts int
 var NumberOfSalesforceAccounts int
 
+type Configuration struct {
+	FileToCompare      string
+	IsAddFileToCheck   bool
+	AddFileNameToCheck string
+	ResultFileName     string
+	MinSimilarRanking  float64
+	StopWordsFile      string
+}
+
 type Account struct {
-	Id       		  string
+	Id                string
 	Name              string
 	Street            string
 	Compare           string
@@ -29,7 +39,7 @@ type Account struct {
 	Benchmark         float64
 	BenchmarkName     float64
 	BenchmarkStreet   float64
-	BenchmarkMeta     float64
+	RankingCombined   float64
 	DuplicateId       string
 	DuplicateNameId   string
 	DuplicateStreetId string
@@ -55,32 +65,44 @@ func calculateRating(object string, toCompareObject string) float64 {
 
 func replaceStopWords(str string, stopwords []StopWord) string {
 	//str = strings.ToLower(str)
-	/*for index := range stopwords {
+	for index := range stopwords {
 		strings.ReplaceAll(str, stopwords[index].replace_to, stopwords[index].replace_with)
-	}*/
+		// fmt.Println(stopwords[index].replace_to, "index")
+	}
 	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(str), "工業股份有限公司", ""), "股份有限公司", ""), "有限公司", ""), "科技", ""), ".", " "), ",", " "), " inc", ""), " corporation", ""), " gmbh", ""), " ltd", ""), "-", " "), "#", " "), " ", ""), "company", ""), "電子", ""), "电子", ""), "宁波", ""), "aktiengesellschaft", "")
-	//return str
 }
 
 func main() {
-	fmt.Println("Duplicates search started")
+	// Read config file
+	fileConf, _ := os.Open("conf.json")
+	defer fileConf.Close()
+	decoder := json.NewDecoder(fileConf)
+	configuration := Configuration{}
+	err := decoder.Decode(&configuration)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
 
-	var country string = "DELTA"
-	var isAddFileToCheck bool = true
+	var fileToCompare string = configuration.FileToCompare
+	var isAddFileToCheck bool = configuration.IsAddFileToCheck
+	var addFileNameToCheck string = configuration.AddFileNameToCheck
+	var resultFileName string = configuration.ResultFileName
 	var wordsToTest []string
 	var compare []string
 	var accountsId []string
 	var compare_name []string
 	var compareStreet []string
 
-	fmt.Println(country)
+	fmt.Println("Duplicates search started")
+
+	fmt.Println("File to compare", fileToCompare)
 
 	reg, err := regexp.Compile("[ ]{2,}")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	csvStopFile, _ := os.Open("stopwords.csv")
+	csvStopFile, _ := os.Open(configuration.StopWordsFile)
 	readerStop := csv.NewReader(bufio.NewReader(csvStopFile))
 	var stopWords []StopWord
 	for {
@@ -97,7 +119,7 @@ func main() {
 
 	fmt.Println(stopWords)
 
-	csvFile, _ := os.Open("duplicates_" + country + ".csv")
+	csvFile, _ := os.Open(fileToCompare)
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 	var accounts []Account
 	for {
@@ -107,13 +129,11 @@ func main() {
 		} else if error != nil {
 			log.Fatal(error)
 		}
-		//s := line[1]
 		accounts = append(accounts, Account{
-			Id: line[0],
-			Name:        replaceStopWords(line[1], stopWords),
-			Street:      reg.ReplaceAllString(strings.ToLower(line[2]), ""),
-			Compare:     strings.ToLower(replaceStopWords(line[1], stopWords) + " " + line[2]),
-			//Benchmark:   0,
+			Id:      line[0],
+			Name:    replaceStopWords(line[1], stopWords),
+			Street:  reg.ReplaceAllString(strings.ToLower(line[2]), ""),
+			Compare: strings.ToLower(replaceStopWords(line[1], stopWords) + " " + line[2]),
 		})
 		wordsToTest = append(wordsToTest, strings.ToLower(replaceStopWords(line[1], stopWords)+" "+line[2]))
 		compare = append(compare, strings.ToLower(replaceStopWords(line[1], stopWords)+" "+line[2]))
@@ -125,7 +145,7 @@ func main() {
 
 	NumberOfAccounts = len(compare)
 	if isAddFileToCheck {
-		csvSfFile, _ := os.Open("additional.csv")
+		csvSfFile, _ := os.Open(addFileNameToCheck)
 		readerSF := csv.NewReader(bufio.NewReader(csvSfFile))
 		for {
 			line, error := readerSF.Read()
@@ -134,7 +154,6 @@ func main() {
 			} else if error != nil {
 				log.Fatal(error)
 			}
-			//sfAccounts = append(sfAccounts, line[1]+line[2])
 			compare = append(compare, strings.ToLower(replaceStopWords(line[1], stopWords)+" "+line[2]))
 			accountsId = append(accountsId, line[0])
 			compare_name = append(compare_name, replaceStopWords(line[1], stopWords))
@@ -143,7 +162,7 @@ func main() {
 	}
 	NumberOfSalesforceAccounts = len(compare) - NumberOfAccounts
 
-	file, err := os.Create("result_" + country + ".csv")
+	file, err := os.Create(resultFileName)
 	defer file.Close()
 
 	if err != nil {
@@ -167,24 +186,11 @@ func main() {
 
 		for i, com := range compare {
 
-			// element.BenchmarkName = calculateRating(element.CompareName, compare_name[i])
-			/*
-				distance_name := levenshtein.ComputeDistance(element.Name, compare_name[i])
-				length_name := math.Max(float64(len(element.Name)), float64(len(compare_name[i])))
-				ranking_name := (length_name - float64(distance_name)) / length_name
-				if ranking_name > element.BenchmarkName {
-					element.BenchmarkName = ranking_name
-					element.DuplicateNameId = accountsId[i]
-					element.CompareName = compare_name[i]
-					//fmt.Println(element.Name, compare_name[i])
-
-				}
-			*/
 			rankingName := calculateRating(element.Name, compare_name[i])
 
 			rankingStreet := float64(0)
 			ranking := float64(0)
-			if rankingName > 0.7 {
+			if rankingName > configuration.MinSimilarRanking {
 
 				ranking = calculateRating(element.Compare, com)
 
@@ -205,31 +211,23 @@ func main() {
 				}
 				rankingStreet = rankingStreet / float64(len(streetNameList))
 			}
+			rankingCombined := (ranking + rankingName + rankingStreet) / 3
 
-			//rankingStreetTest := calculateRating(element.Street, compareStreet[i])
-
-			//fmt.Println(rankingStreet, rankingStreetTest)
-			rankingMeta := (ranking + rankingName + rankingStreet) / 3
-
-			if rankingMeta > element.BenchmarkMeta {
-				//element.Benchmark = ranking
+			if rankingCombined > element.RankingCombined {
 
 				element.DuplicateId = accountsId[i]
 				element.CompareString = com
-
-				//if rankingStreet > element.BenchmarkStreet {
-				//element.BenchmarkStreet = ranking
 				element.DuplicateStreetId = accountsId[i]
 				element.CompareStreet = compareStreet[i]
-				//}
+
 				element.Benchmark = ranking
 				element.BenchmarkName = rankingName
 				element.BenchmarkStreet = rankingStreet
 
-				element.BenchmarkMeta = rankingMeta
-				//fmt.Println(floattostr(element.Benchmark), floattostr(element.BenchmarkName), floattostr(element.BenchmarkStreet), floattostr(element.BenchmarkMeta))
+				element.RankingCombined = rankingCombined
+
 				if ranking == 1.00 {
-					element.BenchmarkMeta = ranking
+					element.RankingCombined = ranking
 					break
 				}
 			}
@@ -239,15 +237,13 @@ func main() {
 		// Loading progress
 		if index%10 == 0 {
 			fmt.Println()
-			fmt.Println()
 			fmt.Println(floattostr(loadingProgress(index)), "% ready")
 			fmt.Println()
 		}
 
-		fmt.Printf(floattostr(element.Benchmark), element.Compare, element.DuplicateId)
+		fmt.Println("Similarity: " + floattostr((element.Benchmark * 100)) + "% between " + element.Compare + " and " + element.DuplicateId)
 		var s []string
-		s = append(s, element.Id, element.Name, element.Street, element.DuplicateId, element.CompareString, floattostr(element.Benchmark), floattostr(element.BenchmarkMeta), element.DuplicateNameId, element.CompareName, floattostr(element.BenchmarkName), element.DuplicateStreetId, element.CompareStreet, floattostr(element.BenchmarkName))
-		//s = append(s, element.Id, element.Name, element.Street, element.DuplicateId, element.CompareString, floattostr(element.Benchmark))
+		s = append(s, element.Id, element.Name, element.Street, element.DuplicateId, element.CompareString, floattostr(element.Benchmark), floattostr(element.RankingCombined), element.DuplicateNameId, element.CompareName, floattostr(element.BenchmarkName), element.DuplicateStreetId, element.CompareStreet, floattostr(element.BenchmarkName))
 		csvWriter.Write(s)
 		if isDebug && index == 10 {
 			break
