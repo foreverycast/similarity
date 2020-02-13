@@ -18,7 +18,7 @@ import (
 )
 
 var NumberOfAccounts int
-var NumberOfSalesforceAccounts int
+var NumberOfAdditionalAccounts int
 
 type Configuration struct {
 	FileToCompare      string
@@ -56,7 +56,7 @@ func floattostr(fv float64) string {
 }
 
 func loadingProgress(i int) float64 {
-	return ((float64(i) * (2*float64(NumberOfAccounts) + 2*float64(NumberOfSalesforceAccounts) - float64(i) - 1) / 2) / (float64(NumberOfAccounts)*float64(NumberOfSalesforceAccounts) + float64(NumberOfAccounts)*(float64(NumberOfAccounts)-1)/2) * 100)
+	return ((float64(i) * (2*float64(NumberOfAccounts) + 2*float64(NumberOfAdditionalAccounts) - float64(i) - 1) / 2) / (float64(NumberOfAccounts)*float64(NumberOfAdditionalAccounts) + float64(NumberOfAccounts)*(float64(NumberOfAccounts)-1)/2) * 100)
 }
 
 func calculateRating(object string, toCompareObject string) float64 {
@@ -160,7 +160,7 @@ func main() {
 			compareStreet = append(compareStreet, reg.ReplaceAllString(strings.ToLower(line[2]), ""))
 		}
 	}
-	NumberOfSalesforceAccounts = len(compare) - NumberOfAccounts
+	NumberOfAdditionalAccounts = len(compare) - NumberOfAccounts
 
 	file, err := os.Create(resultFileName)
 	defer file.Close()
